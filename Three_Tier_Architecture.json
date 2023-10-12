@@ -1,0 +1,407 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "3-Tier Architecture - Web, Application, and Database Tiers",
+  "Parameters": {
+    "KeyName": {
+      "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription": "Name of an existing KeyPair."
+    },
+	"WebServerAMI": {
+      "Type": "String",
+      "Description": "Web Server AMI ID"
+    },
+    "AppServerAMI": {
+      "Type": "String",
+      "Description": "Application Server AMI ID"
+    },
+	 "DBUsername": {
+      "Type": "String",
+      "Description": "Database Master Username"
+    },
+    "DBPassword": {
+      "Type": "String",
+      "Description": "Database Master Password"
+    },
+	"AvailabilityZone1": {
+      "Description": "Availability Zone 1",
+      "Type": "AWS::EC2::AvailabilityZone::Name",
+      "Default": "us-east-1a" 
+    },
+    "AvailabilityZone2": {
+      "Description": "Availability Zone 2",
+      "Type": "AWS::EC2::AvailabilityZone::Name",
+      "Default": "us-east-1b" 
+  }
+  },
+  "Resources": {
+    "WebVPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16"
+      }
+    },
+    "WebPublicSubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "WebVPC" },
+        "AvailabilityZone": { "Ref": "AvailabilityZone1" },
+        "CidrBlock": "10.0.0.0/24"
+      }
+    },
+    "WebPublicSubnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "WebVPC" },
+        "AvailabilityZone": { "Ref": "AvailabilityZone2" },
+        "CidrBlock": "10.0.1.0/24"
+      }
+    },
+	"AppPrivateSubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "WebVPC" },
+        "AvailabilityZone": { "Ref": "AvailabilityZone1" },
+        "CidrBlock": "10.0.2.0/24"
+      }
+    },
+    "AppPrivateSubnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "WebVPC" },
+        "AvailabilityZone": { "Ref": "AvailabilityZone2" },
+        "CidrBlock": "10.0.3.0/24"
+      }
+    },
+	"DBPrivateSubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "WebVPC" },
+        "AvailabilityZone": { "Ref": "AvailabilityZone1" },
+        "CidrBlock": "10.0.4.0/24"
+      }
+    },
+    "DBPrivateSubnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "WebVPC" },
+        "AvailabilityZone": { "Ref": "AvailabilityZone2" },
+        "CidrBlock": "10.0.5.0/24"
+      }
+    },
+    
+    
+    "WebInternetGateway": {
+      "Type": "AWS::EC2::InternetGateway"
+    },
+    "WebAttachGateway": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": { "Ref": "WebVPC" },
+        "InternetGatewayId": { "Ref": "WebInternetGateway" }
+      }
+    },
+    "WebLoadBalancerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security group for Web Load Balancer",
+        "VpcId": { "Ref": "WebVPC" },
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": 80,
+            "ToPort": 80,
+            "IpProtocol": "tcp"
+          }
+        ]
+      }
+    },
+	
+    "WebSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security group for Web Tier ASG",
+        "VpcId": { "Ref": "WebVPC" },
+        "SecurityGroupIngress": [
+          {
+            "SourceSecurityGroupId": { "Fn::GetAtt": ["WebLoadBalancerSecurityGroup", "GroupId"] },
+            "FromPort": 80,
+            "ToPort": 80,
+            "IpProtocol": "tcp"
+          }
+        ]
+      }
+    },
+	
+	"AppLoadBalancerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security group for App Load Balancer",
+        "VpcId": { "Ref": "WebVPC" },
+        "SecurityGroupIngress": [
+          {
+            "SourceSecurityGroupId": { "Fn::GetAtt": ["WebSecurityGroup", "GroupId"] },
+            "FromPort": 80,
+            "ToPort": 80,
+            "IpProtocol": "tcp"
+          }
+        ]
+      }
+    },
+	"AppSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security group for for App Tier ASG",
+        "VpcId": { "Ref": "AppVPC" },
+		"SecurityGroupIngress": [
+          {
+            "SourceSecurityGroupId": { "Fn::GetAtt": ["AppLoadBalancerSecurityGroup", "GroupId"] },
+            "FromPort": 80,
+            "ToPort": 80,
+            "IpProtocol": "tcp"
+          }
+        ]
+      }
+    },
+	
+	"DBSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security group for Database Tier",
+        "VpcId": { "Ref": "WebVPC" },
+        "SecurityGroupIngress": [
+          {
+            "SourceSecurityGroupId": { "Fn::GetAtt": ["AppSecurityGroup", "GroupId"] },
+            "FromPort": 3306,
+            "ToPort": 3306,
+            "IpProtocol": "tcp"
+          }
+        ]
+      }
+    },
+    "WebLoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+        "Subnets": [{ "Ref": "WebPublicSubnet1" }, { "Ref": "WebPublicSubnet2" }],
+        "SecurityGroups": [{ "Fn::GetAtt": ["WebLoadBalancerSecurityGroup", "GroupId"] }],
+        "Scheme": "internet-facing"
+      }
+    },
+	"WebTargetGroup": {
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties": {
+        "Name": "WebTargetGroup",
+        "Port": 80,
+        "Protocol": "HTTP",
+        "VpcId": {
+          "Ref": "WebVPC"
+        }
+      }
+    },
+    "WebAutoScalingGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "LaunchConfigurationName": { "Ref": "WebLaunchConfiguration" },
+        "MinSize": 2,
+        "MaxSize": 4,
+        "DesiredCapacity": 2,
+		"TargetGroupARNs": [
+          {
+            "Ref": "WebTargetGroup"
+          }
+        ],
+        "VPCZoneIdentifier": [{ "Ref": "WebPublicSubnet1" }, { "Ref": "WebPublicSubnet2" }],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "WebInstance",
+            "PropagateAtLaunch": true
+          }
+        ]
+      }
+    },
+    "WebLaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "KeyName": { "Ref": "KeyName" },
+        "ImageId": { "Ref": "AppServerAMI" }
+        "InstanceType": "t2.micro",
+        "SecurityGroups": [{ "Fn::GetAtt": ["WebSecurityGroup", "GroupId"] }],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Sub": "#!/bin/bash\n# Your user data script here"
+          }
+        }
+      }
+    },
+	
+	"WebTargetGroup": {
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties": {
+        "Name": "AppTargetGroup",
+        "Port": 80,
+        "Protocol": "HTTP",
+        "VpcId": {
+          "Ref": "WebVPC"
+        }
+      }
+    },
+	"AppTargetGroup": {
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties": {
+        "Name": "AppTargetGroup",
+        "Port": 80,
+        "Protocol": "HTTP",
+        "VpcId": {
+          "Ref": "WebVPC"
+        }
+      }
+    },
+ 
+    "AppLoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+        "Subnets": [{ "Ref": "AppPrivateSubnet1" }, { "Ref": "AppPrivateSubnet2" }],
+        "SecurityGroups": [        
+          { "Fn::GetAtt": ["AppLoadBalancerSecurityGroup", "GroupId"] }
+        ],
+        "Scheme": "internal"
+		"Listeners": [
+          {
+            "Port": 80,
+            "Protocol": "HTTP",
+            "DefaultActions": [
+              {
+                "Type": "forward",
+                "TargetGroupArn": {
+                  "Ref": "AppTargetGroup"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+	
+	
+      "AppAutoScalingGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "LaunchConfigurationName": { "Ref": "AppLaunchConfiguration" },
+        "MinSize": 2,
+        "MaxSize": 4,
+        "DesiredCapacity": 2,
+		"TargetGroupARNs": [
+          {
+            "Ref": "AppTargetGroup"
+          }
+        ],
+        "VPCZoneIdentifier": [{ "Ref": "AppPrivateSubnet1" }, { "Ref": "AppPrivateSubnet2" }],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "AppInstance",
+            "PropagateAtLaunch": true
+          }
+        ]
+      }
+    },
+    "AppLaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "KeyName": { "Ref": "KeyName" },
+        "ImageId": { "Ref": "AppServerAMI" }
+        "InstanceType": "t2.micro",
+        "SecurityGroups": [
+          { "Fn::GetAtt": ["AppSecurityGroup", "GroupId"] }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Sub": "#!/bin/bash\n# Your user data script here"
+          }
+        }
+      }
+    },
+    "AppScaleUpPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ChangeInCapacity",
+        "AutoScalingGroupName": { "Ref": "AppAutoScalingGroup" },
+        "Cooldown": 60,
+        "ScalingAdjustment": 1
+      }
+    },
+    "AppScaleDownPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ChangeInCapacity",
+        "AutoScalingGroupName": { "Ref": "AppAutoScalingGroup" },
+        "Cooldown": 60,
+        "ScalingAdjustment": -1
+      }
+    },
+   
+    
+   "AuroraDBCluster": {
+      "Type": "AWS::RDS::DBCluster",
+      "Properties": {
+        "Engine": "aurora",
+        "EngineMode": "provisioned",
+        "MasterUsername": { "Ref": "DBUsername" },
+        "MasterUserPassword": { "Ref": "DBPassword" },
+        "DBSubnetGroupName": { "Ref": "DBSubnetGroup" },
+        "AvailabilityZones": [ { "Ref": "AvailabilityZone1" }, { "Ref": "AvailabilityZone2" } ],
+        "BackupRetentionPeriod": 7,
+        "PreferredBackupWindow": "x:x:x"
+      }
+    },
+    "ReadReplicaDBInstance": {
+      "Type": "AWS::RDS::DBInstance",
+      "Properties": {
+        "Engine": "aurora",
+        "DBInstanceClass": "db.t2.small",
+        "DBSubnetGroupName": { "Ref": "DBSubnetGroup" },
+        "SourceDBInstanceIdentifier": { "Ref": "AuroraDBCluster" }
+      }
+    },
+    "DBSubnetGroup": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "Properties": {
+        "DBSubnetGroupDescription": "Subnet group for Aurora DB",
+        "SubnetIds": [{ "Ref": "DBPrivateSubnet1" }, { "Ref": "DBPrivateSubnet2" }]
+      }
+    }
+	 "Route53Zone": {
+      "Type": "AWS::Route53::HostedZone",
+      "Properties": {
+        "Name": "example.com"
+      }
+    },
+    "Route53Record": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneName": "example.com.",
+        "Name": "service.example.com.",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": { "Fn::GetAtt": [ "WebLoadBalancer", "CanonicalHostedZoneID" ] },
+          "DNSName": { "Fn::GetAtt": [ "WebLoadBalancer", "DNSName" ] }
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "WebLoadBalancerDNS": {
+      "Description": "DNS name of the Web Load Balancer",
+      "Value": { "Fn::GetAtt": ["WebLoadBalancer", "DNSName"] }
+    },
+    "AppLoadBalancerDNS": {
+      "Description": "DNS name of the Application Load Balancer",
+      "Value": { "Fn::GetAtt": ["AppLoadBalancer", "DNSName"] }
+    },
+    "DBClusterEndpoint": {
+      "Description": "Endpoint of the Aurora RDS Database Cluster",
+      "Value": { "Fn::GetAtt": ["DBCluster", "Endpoint.Address"] }
+    }
+  }
+}
