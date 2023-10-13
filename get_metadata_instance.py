@@ -11,9 +11,9 @@ def get_instance_metadata_value(instance_id, data_key):
             if data_key in instance:
                 return instance[data_key]
             else:
-                print(f"Data key '{data_key}' not found in instance metadata."f)
+                print(f"Data key '{data_key}' not found in instance metadata.")
         else:
-            print(f"No instance found with ID {instance_id}"f)
+            print(f"No instance found with ID {instance_id}")
     except Exception as e:
         print("Error: {e}")
 
@@ -28,7 +28,7 @@ def get_instance_metadata_value(instance_id, data_key):
             instance_details) = instance_info["Reservations"][0]["Instances"][0]
             return(instance_details)
         else:
-            print(f"No instance found with ID {instance_id}"f)
+            print(f"No instance found with ID {instance_id}")
     except Exception as e:
         print("Error: {e}")
 
