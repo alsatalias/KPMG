@@ -2,11 +2,7 @@
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "3-Tier Architecture - Web, Application, and Database Tiers",
   "Parameters": {
-    "KeyName": {
-      "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
-      "Type": "AWS::EC2::KeyPair::KeyName",
-      "ConstraintDescription": "Name of an existing KeyPair."
-    },
+    
     "WebServerAMI": {
       "Type": "String",
       "Description": "Web Server AMI ID"
