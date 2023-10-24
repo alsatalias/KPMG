@@ -26,15 +26,15 @@ def get_nested_value(data, key):
                     result = get_nested_value(item, key)
                     if result is not None:
                         return result
-
-# Inputs:
-data = {"a": {"b": {"c": "d"}}}
-
-key_to_find = "a/b/c"
-
-result = get_nested_value(data, key_to_find)
-
-if result is not None:
-    print(f"The value for key'{key_to_find}' is: {result}")
-else:
-    print(f"Key '{key_to_find}' not found in the nested object.")
+if __name__ == "__main__":
+    # Inputs:
+    data = {"a": {"b": {"c": "d"}}}
+    
+    key_to_find = "a/b/c"
+    
+    result = get_nested_value(data, key_to_find)
+    
+    if result is not None:
+        print(f"The value for key'{key_to_find}' is: {result}")
+    else:
+        print(f"Key '{key_to_find}' not found in the nested object.")
